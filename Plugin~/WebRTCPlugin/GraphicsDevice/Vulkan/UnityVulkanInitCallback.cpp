@@ -1,5 +1,7 @@
-#include "pch.h"
+#include <set>
+#include <cstring>
 
+#include "pch.h"
 #include "UnityVulkanInitCallback.h"
 
 namespace unity
@@ -42,13 +44,15 @@ namespace webrtc
         }
 
         // get the union of the two
-        std::vector<const char*> newExtensions;
-        std::set_union(
-            requestedDeviceExtensions.begin(),
-            requestedDeviceExtensions.end(),
-            enabledExtensions.begin(),
-            enabledExtensions.end(),
-            std::inserter(newExtensions, std::end(newExtensions)));
+        struct cmp {
+            bool operator()(const char* lhs, const char* rhs) const {
+                return std::strcmp(lhs, rhs) < 0;
+            }
+        };
+        std::set<const char*,cmp> newExtensionsSet;
+        newExtensionsSet.insert(requestedDeviceExtensions.begin(), requestedDeviceExtensions.end());
+        newExtensionsSet.insert(enabledExtensions.begin(), enabledExtensions.end());
+        std::vector<const char*> newExtensions(newExtensionsSet.begin(),newExtensionsSet.end());
 
         RTC_LOG(LS_INFO) << "WebRTC plugin intercepts vkCreateDevice.";
 
@@ -89,13 +93,15 @@ namespace webrtc
         }
 
         // get the union of the two
-        std::vector<const char*> newExtensions;
-        std::set_union(
-            requestedInstanceExtensions.begin(),
-            requestedInstanceExtensions.end(),
-            enabledExtensions.begin(),
-            enabledExtensions.end(),
-            std::inserter(newExtensions, std::end(newExtensions)));
+        struct cmp {
+            bool operator()(const char* lhs, const char* rhs) const {
+                return std::strcmp(lhs, rhs) < 0;
+            }
+        };
+        std::set<const char*,cmp> newExtensionsSet;
+        newExtensionsSet.insert(requestedInstanceExtensions.begin(), requestedInstanceExtensions.end());
+        newExtensionsSet.insert(enabledExtensions.begin(), enabledExtensions.end());
+        std::vector<const char*> newExtensions(newExtensionsSet.begin(),newExtensionsSet.end());
 
         RTC_LOG(LS_INFO) << "WebRTC plugin intercepts vkCreateInstance.";
 
