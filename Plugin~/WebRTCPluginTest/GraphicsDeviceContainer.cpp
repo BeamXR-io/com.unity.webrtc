@@ -36,10 +36,15 @@
 #pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #endif
 
+#include "WebRTCPlugin.h"
+
 namespace unity
 {
 namespace webrtc
 {
+    // For symbol compatibility with the plugin
+    static IGraphicsDevice* s_gfxDevice = nullptr;
+    IGraphicsDevice* Plugin::GraphicsDevice() { return s_gfxDevice; }
 
 #if defined(SUPPORT_D3D11) // D3D11
 
@@ -168,7 +173,7 @@ namespace webrtc
         for (size_t i = 0; i < list.size(); ++i)
         {
             VkPhysicalDevice physicalDevice = list[i];
-            if (!VulkanUtility::GetPhysicalDeviceUUIDInto(instance, physicalDevice, &deviceUUID))
+            if (!VulkanUtility::GetPhysicalDeviceUUID(instance, physicalDevice, &deviceUUID))
             {
                 continue;
             }
@@ -349,11 +354,13 @@ namespace webrtc
         vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 
         UnityVulkanInstance* pVkInstance = new UnityVulkanInstance;
+        pVkInstance->pipelineCache = nullptr;
         pVkInstance->instance = instance;
         pVkInstance->physicalDevice = physicalDevice;
         pVkInstance->device = device;
-        pVkInstance->queueFamilyIndex = queueFamilyIndex;
         pVkInstance->graphicsQueue = queue;
+        pVkInstance->getInstanceProcAddr = nullptr;
+        pVkInstance->queueFamilyIndex = queueFamilyIndex;
         return pVkInstance;
     }
 
@@ -532,6 +539,7 @@ namespace webrtc
             device = GraphicsDevice::GetInstance().Init(renderer, nativeGfxDevice_, nullptr, nullptr);
         }
         device_ = std::unique_ptr<IGraphicsDevice>(device);
+        s_gfxDevice = device_.get();
         EXPECT_TRUE(device_->InitV());
     }
 
@@ -539,6 +547,7 @@ namespace webrtc
     {
         if (device_)
             device_->ShutdownV();
+        s_gfxDevice = nullptr;
         if (nativeGfxDevice_)
             DestroyNativeGfxDevice(nativeGfxDevice_, renderer_);
     }

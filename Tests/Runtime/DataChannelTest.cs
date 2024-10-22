@@ -1,12 +1,12 @@
 using System;
-using UnityEngine.TestTools;
-using NUnit.Framework;
 using System.Collections;
 using System.Diagnostics;
-using Object = UnityEngine.Object;
+using NUnit.Framework;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.TestTools;
+using Object = UnityEngine.Object;
 
 namespace Unity.WebRTC.RuntimeTest
 {
@@ -16,7 +16,7 @@ namespace Unity.WebRTC.RuntimeTest
         public void CreateDataChannel()
         {
             RTCConfiguration config = default;
-            config.iceServers = new[] {new RTCIceServer {urls = new[] {"stun:stun.l.google.com:19302"}}};
+            config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
             var peer = new RTCPeerConnection(ref config);
             var channel1 = peer.CreateDataChannel("test1");
             Assert.AreEqual("test1", channel1.Label);
@@ -139,6 +139,38 @@ namespace Unity.WebRTC.RuntimeTest
 
             var op1 = new WaitUntilWithTimeout(() => test.component.GetDataChannelList(1).Count > 0, 5000);
             yield return op1;
+            Assert.That(test.component.GetDataChannelList(1).Count, Is.GreaterThan(0));
+
+            test.component.Dispose();
+            Object.DestroyImmediate(test.gameObject);
+        }
+
+        [UnityTest]
+        [Timeout(5000)]
+        public IEnumerator CreateAndClose()
+        {
+            var test = new MonoBehaviourTest<SignalingPeers>();
+            var label = "test";
+            bool closed = false;
+
+            RTCDataChannel channel1 = test.component.CreateDataChannel(0, label);
+            Assert.That(channel1, Is.Not.Null);
+            yield return test;
+
+            var op1 = new WaitUntilWithTimeout(() => test.component.GetDataChannelList(1).Count > 0, 5000);
+            yield return op1;
+            RTCDataChannel channel2 = test.component.GetDataChannelList(1)[0];
+            Assert.That(channel2, Is.Not.Null);
+            channel2.OnClose = () => { closed = true; };
+
+            channel1.Close();
+
+            var op2 = new WaitUntilWithTimeout(() => closed, 5000);
+            yield return op2;
+            Assert.That(closed, Is.True);
+
+            test.component.Dispose();
+            Object.DestroyImmediate(test.gameObject);
         }
 
         [UnityTest]
@@ -174,7 +206,7 @@ namespace Unity.WebRTC.RuntimeTest
             Assert.That(message1, Is.EqualTo(message2));
 
             // send byte array
-            byte[] message3 = {1, 2, 3};
+            byte[] message3 = { 1, 2, 3 };
             byte[] message4 = null;
             channel2.OnMessage = bytes => { message4 = bytes; };
             channel1.Send(message3);
@@ -313,7 +345,7 @@ namespace Unity.WebRTC.RuntimeTest
         static void ExecutePendingTasksWithTimeout(ref string message, int timeoutInMilliseconds)
         {
             Stopwatch watchdog = Stopwatch.StartNew();
-            while(watchdog.ElapsedMilliseconds < timeoutInMilliseconds && message == null)
+            while (watchdog.ElapsedMilliseconds < timeoutInMilliseconds && message == null)
             {
                 WebRTC.ExecutePendingTasks(timeoutInMilliseconds);
             }
@@ -323,7 +355,7 @@ namespace Unity.WebRTC.RuntimeTest
         static void ExecutePendingTasksWithTimeout(ref byte[] message, int timeoutInMilliseconds)
         {
             Stopwatch watchdog = Stopwatch.StartNew();
-            while(watchdog.ElapsedMilliseconds < timeoutInMilliseconds && message == null)
+            while (watchdog.ElapsedMilliseconds < timeoutInMilliseconds && message == null)
             {
                 WebRTC.ExecutePendingTasks(timeoutInMilliseconds);
             }

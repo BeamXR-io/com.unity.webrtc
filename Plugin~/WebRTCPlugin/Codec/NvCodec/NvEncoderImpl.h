@@ -5,13 +5,13 @@
 #include <api/video_codecs/video_codec.h>
 #include <api/video_codecs/video_encoder.h>
 #include <common_video/h264/h264_bitstream_parser.h>
-#include <common_video/include/bitrate_adjuster.h>
 #include <media/base/codec.h>
-#include <system_wrappers/include/clock.h>
 
 #include "NvCodec.h"
 #include "NvEncoder/NvEncoderCuda.h"
 #include "Size.h"
+
+class UnityProfilerMarkerDesc;
 
 namespace unity
 {
@@ -79,8 +79,6 @@ namespace webrtc
             CUcontext context,
             CUmemorytype memoryType);
 
-        void Resize(const CUarray& src, CUarray& dst, const Size& size);
-
         CUcontext m_context;
         CUmemorytype m_memoryType;
         CUarray m_scaledArray;
@@ -96,9 +94,6 @@ namespace webrtc
         EncodedImage m_encodedImage;
         //    RTPFragmentationHeader m_fragHeader;
         H264BitstreamParser m_h264BitstreamParser;
-        std::unique_ptr<BitrateAdjuster> m_bitrateAdjuster;
-        RateStatistics m_encode_fps;
-        Clock* const m_clock;
         GUID m_profileGuid;
         NV_ENC_LEVEL m_level;
         ProfilerMarkerFactory* m_profiler;

@@ -1,8 +1,8 @@
 {
-  "name": "com.unity.webrtc",
+  "name": "com.kannan-xiao4.webrtc",
   "displayName": "WebRTC",
-  "version": "3.0.0-pre.6",
-  "unity": "2020.3",
+  "version": "3.0.2-pre.7",
+  "unity": "2022.3",
   "description": "The WebRTC package provides browsers and mobile applications with Real-Time Communications (RTC) capabilities.",
   "keywords": [
     "webrtc",

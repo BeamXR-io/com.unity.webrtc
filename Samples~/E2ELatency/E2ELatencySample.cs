@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 using Unity.WebRTC;
 using Unity.WebRTC.Samples;
+using UnityEngine;
 using UnityEngine.UI;
 using Button = UnityEngine.UI.Button;
 
@@ -18,6 +18,7 @@ class E2ELatencySample : MonoBehaviour
     [SerializeField] private Text textLatency;
     [SerializeField] private Text textAverageLatency;
     [SerializeField] private Dropdown dropDownFramerate;
+    [SerializeField] private Toggle toggleSyncApplicationFramerate;
 
     [SerializeField] private BarcodeEncoder encoder;
     [SerializeField] private BarcodeDecoder decoder;
@@ -81,6 +82,9 @@ class E2ELatencySample : MonoBehaviour
             listFramerate.Select(_ => new Dropdown.OptionData($"{_}")).ToList();
         dropDownFramerate.value = 1;
         dropDownFramerate.onValueChanged.AddListener(OnFramerateChanged);
+        toggleSyncApplicationFramerate.interactable = true;
+        toggleSyncApplicationFramerate.isOn = true;
+
         OnFramerateChanged(dropDownFramerate.value);
 
         pc1OnIceConnectionChange = state => { OnIceConnectionChange(_pc1, state); };
@@ -109,6 +113,7 @@ class E2ELatencySample : MonoBehaviour
         startButton.interactable = false;
         callButton.interactable = true;
         dropDownFramerate.interactable = false;
+        toggleSyncApplicationFramerate.interactable = false;
         if (sendStream == null)
         {
             int width = WebRTCSettings.StreamSize.x;
@@ -175,7 +180,7 @@ class E2ELatencySample : MonoBehaviour
     private static RTCConfiguration GetSelectedSdpSemantics()
     {
         RTCConfiguration config = default;
-        config.iceServers = new[] {new RTCIceServer {urls = new[] {"stun:stun.l.google.com:19302"}}};
+        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
 
         return config;
     }
@@ -187,9 +192,10 @@ class E2ELatencySample : MonoBehaviour
         if (state == RTCIceConnectionState.Connected || state == RTCIceConnectionState.Completed)
         {
             StartCoroutine(CheckStats(pc));
-            foreach(var sender in _pc1.GetSenders())
+            foreach (var sender in _pc1.GetSenders())
             {
                 ChangeFramerate(sender, (uint)Application.targetFrameRate);
+                sender.SyncApplicationFramerate = toggleSyncApplicationFramerate.isOn;
             }
         }
     }
@@ -277,7 +283,7 @@ class E2ELatencySample : MonoBehaviour
 
         if (WebRTCSettings.UseVideoCodec != null)
         {
-            var codecs = new[] {WebRTCSettings.UseVideoCodec};
+            var codecs = new[] { WebRTCSettings.UseVideoCodec };
             foreach (var transceiver in _pc1.GetTransceivers())
             {
                 if (pc1VideoSenders.Contains(transceiver.Sender))
@@ -357,6 +363,7 @@ class E2ELatencySample : MonoBehaviour
         callButton.interactable = false;
         hangUpButton.interactable = false;
         dropDownFramerate.interactable = true;
+        toggleSyncApplicationFramerate.interactable = true;
         receiveImage.color = Color.black;
     }
 

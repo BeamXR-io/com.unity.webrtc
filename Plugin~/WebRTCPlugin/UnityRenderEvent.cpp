@@ -177,7 +177,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
 // Unity plugin load event
 void PluginLoad(IUnityInterfaces* unityInterfaces)
 {
-#if WIN32 && _DEBUG
+#if _WIN32 && _DEBUG
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
@@ -273,6 +273,9 @@ static void UNITY_INTERFACE_API OnBatchUpdateEvent(int eventID, void* data)
     IGraphicsDevice* device = Plugin::GraphicsDevice();
     UnityGfxRenderer gfxRenderer = device->GetGfxRenderer();
     Timestamp timestamp = s_clock->CurrentTime();
+
+    if (!device->UpdateState())
+        return;
 
     for (int i = 0; i < batchData->tracksCount; i++)
     {

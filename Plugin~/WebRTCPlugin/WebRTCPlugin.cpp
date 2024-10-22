@@ -469,6 +469,7 @@ extern "C"
         PeerConnectionInterface::RTCConfiguration config;
         config.sdp_semantics = SdpSemantics::kUnifiedPlan;
         config.enable_implicit_rollback = true;
+        config.set_suspend_below_min_bitrate(false);
         return context->CreatePeerConnection(config);
     }
 
@@ -481,6 +482,7 @@ extern "C"
 
         config.sdp_semantics = SdpSemantics::kUnifiedPlan;
         config.enable_implicit_rollback = true;
+        config.set_suspend_below_min_bitrate(false);
         return context->CreatePeerConnection(config);
     }
 
@@ -806,6 +808,13 @@ extern "C"
         *errorType = obj->SetRemoteDescription(*desc, observer, error_);
         *error = ConvertString(error_);
         return observer.get();
+    }
+
+    UNITY_INTERFACE_EXPORT bool PeerConnectionCanTrickleIceCandidates(PeerConnectionObject* obj, bool* value)
+    {
+        absl::optional<bool> result = obj->connection->can_trickle_ice_candidates();
+        *value = result.value_or(false);
+        return result.has_value();
     }
 
     UNITY_INTERFACE_EXPORT bool
@@ -1269,6 +1278,16 @@ extern "C"
         return error.type();
     }
 
+    UNITY_INTERFACE_EXPORT bool VideoSourceGetSyncApplicationFramerate(UnityVideoTrackSource* source)
+    {
+        return source->syncApplicationFramerate();
+    }
+
+    UNITY_INTERFACE_EXPORT void VideoSourceSetSyncApplicationFramerate(UnityVideoTrackSource* source, bool value)
+    {
+        source->SetSyncApplicationFramerate(value);
+    }
+
     struct RTCRtpHeaderExtensionCapability
     {
         char* uri;
@@ -1449,6 +1468,12 @@ extern "C"
         context->GetDataChannelObject(channel)->RegisterOnClose(callback);
     }
 
+    UNITY_INTERFACE_EXPORT void
+    DataChannelRegisterOnError(Context* context, DataChannelInterface* channel, DelegateOnError callback)
+    {
+        context->GetDataChannelObject(channel)->RegisterOnError(callback);
+    }
+
     UNITY_INTERFACE_EXPORT void SetCurrentContext(Context* context)
     {
         ContextManager::GetInstance()->curContext = context;
@@ -1524,7 +1549,7 @@ extern "C"
         RTCVideoFrameMetadata* data =
             static_cast<RTCVideoFrameMetadata*>(CoTaskMemAlloc(sizeof(RTCVideoFrameMetadata)));
 
-        auto metadata = frame->GetMetadata();
+        auto metadata = frame->Metadata();
 
         data->frameId = metadata.GetFrameId();
         data->width = metadata.GetWidth();
@@ -1552,6 +1577,12 @@ extern "C"
     UNITY_INTERFACE_EXPORT void FrameSetData(TransformableFrameInterface* frame, const uint8_t* data, size_t size)
     {
         frame->SetData(rtc::ArrayView<const uint8_t>(data, size));
+    }
+
+    UNITY_INTERFACE_EXPORT void SetGraphicsSyncTimeout(uint64_t nSecTimeout)
+    {
+        auto graphicsDevice = Plugin::GraphicsDevice();
+        graphicsDevice->SetSyncTimeout(std::chrono::nanoseconds(nSecTimeout));
     }
 #pragma clang diagnostic pop
 }

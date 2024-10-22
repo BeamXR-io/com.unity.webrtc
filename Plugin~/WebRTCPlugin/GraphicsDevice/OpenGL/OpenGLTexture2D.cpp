@@ -3,21 +3,15 @@
 #include "OpenGLContext.h"
 #include "OpenGLTexture2D.h"
 
-#if CUDA_PLATFORM
-#include <cudaGL.h>
-#endif
-
 namespace unity
 {
 namespace webrtc
 {
-
-    //---------------------------------------------------------------------------------------------------------------------
-
     OpenGLTexture2D::OpenGLTexture2D(uint32_t w, uint32_t h, GLuint tex, ReleaseOpenGLTextureCallback callback)
         : ITexture2D(w, h)
         , m_texture(tex)
         , m_pbo(0)
+        , m_sync(0)
         , m_callback(callback)
     {
         RTC_DCHECK(m_texture);
