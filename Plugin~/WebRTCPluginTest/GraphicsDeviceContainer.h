@@ -15,7 +15,7 @@ namespace webrtc
     {
     public:
         GraphicsDeviceContainer(UnityGfxRenderer renderer);
-        virtual ~GraphicsDeviceContainer();
+        ~GraphicsDeviceContainer();
         IGraphicsDevice* device() { return device_.get(); }
 
     private:

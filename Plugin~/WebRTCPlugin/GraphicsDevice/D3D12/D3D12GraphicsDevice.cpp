@@ -231,7 +231,7 @@ namespace webrtc
         return new D3D12Texture2D(w, h, resource, handle);
     }
 
-    bool D3D12GraphicsDevice::WaitSync(const ITexture2D* texture)
+    bool D3D12GraphicsDevice::WaitSync(const ITexture2D* texture, uint64_t nsTimeout)
     {
         const D3D12Texture2D* d3d12Texture = static_cast<const D3D12Texture2D*>(texture);
         const uint64_t value = d3d12Texture->GetSyncCount();
@@ -248,7 +248,8 @@ namespace webrtc
                 RTC_LOG(LS_INFO) << "ID3D12Fence::SetEventOnCompletion failed. error:" << hr;
                 return false;
             }
-            auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(m_syncTimeout).count();
+            auto nanoseconds = std::chrono::nanoseconds(nsTimeout);
+            auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(nanoseconds).count();
             DWORD ret = WaitForSingleObject(fenceEvent, static_cast<DWORD>(milliseconds));
             CloseHandle(fenceEvent);
 
@@ -387,21 +388,53 @@ namespace webrtc
         if (!IsCudaSupport())
             return nullptr;
 
-        D3D12Texture2D* d3d12Texture = static_cast<D3D12Texture2D*>(texture);
-        ID3D12Resource* resource = static_cast<ID3D12Resource*>(d3d12Texture->GetNativeTexturePtrV());
+        GMB_CUDA_CALL_NULLPTR(cuCtxPushCurrent(GetCUcontext()));
 
-        HANDLE sharedHandle = d3d12Texture->GetHandle();
+        std::unique_ptr<GpuMemoryBufferCudaHandle> handle = std::make_unique<GpuMemoryBufferCudaHandle>();
+        handle->context = GetCUcontext();
+
+        D3D12Texture2D* d3d12Tex = static_cast<D3D12Texture2D*>(texture);
+
+        HANDLE sharedHandle = d3d12Tex->GetHandle();
         if (!sharedHandle)
         {
             RTC_LOG(LS_ERROR) << "cannot get shared handle";
             return nullptr;
         }
 
-        D3D12_RESOURCE_DESC desc = resource->GetDesc();
-        D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo =
-            m_d3d12Device->GetResourceAllocationInfo(0, 1, &desc);
+        size_t width = d3d12Tex->GetWidth();
+        size_t height = d3d12Tex->GetHeight();
+        D3D12_RESOURCE_DESC desc = d3d12Tex->GetDesc();
+        D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo;
+        d3d12ResourceAllocationInfo = m_d3d12Device->GetResourceAllocationInfo(0, 1, &desc);
         size_t actualSize = d3d12ResourceAllocationInfo.SizeInBytes;
-        return GpuMemoryBufferCudaHandle::CreateHandle(GetCUcontext(), resource, sharedHandle, actualSize);
+
+        CUDA_EXTERNAL_MEMORY_HANDLE_DESC memDesc = {};
+        memDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE;
+        memDesc.handle.win32.handle = static_cast<void*>(sharedHandle);
+        memDesc.size = actualSize;
+        memDesc.flags = CUDA_EXTERNAL_MEMORY_DEDICATED;
+
+        GMB_CUDA_CALL_NULLPTR(cuImportExternalMemory(&handle->externalMemory, &memDesc));
+
+        CUDA_ARRAY3D_DESCRIPTOR arrayDesc = {};
+        arrayDesc.Width = width;
+        arrayDesc.Height = height;
+        arrayDesc.Depth = 0; /* CUDA 2D arrays are defined to have depth 0 */
+        arrayDesc.Format = CU_AD_FORMAT_UNSIGNED_INT32;
+        arrayDesc.NumChannels = 1;
+        arrayDesc.Flags = CUDA_ARRAY3D_SURFACE_LDST | CUDA_ARRAY3D_COLOR_ATTACHMENT;
+
+        CUDA_EXTERNAL_MEMORY_MIPMAPPED_ARRAY_DESC mipmapArrayDesc = {};
+        mipmapArrayDesc.arrayDesc = arrayDesc;
+        mipmapArrayDesc.numLevels = 1;
+
+        GMB_CUDA_CALL_NULLPTR(
+            cuExternalMemoryGetMappedMipmappedArray(&handle->mipmappedArray, handle->externalMemory, &mipmapArrayDesc));
+        GMB_CUDA_CALL_NULLPTR(cuMipmappedArrayGetLevel(&handle->mappedArray, handle->mipmappedArray, 0));
+        GMB_CUDA_CALL_NULLPTR(cuCtxPopCurrent(nullptr));
+
+        return std::move(handle);
     }
 
     uint64_t D3D12GraphicsDevice::GetNextFrameFenceValue() const

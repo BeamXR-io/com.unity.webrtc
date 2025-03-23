@@ -7,8 +7,17 @@ namespace unity
 {
 namespace webrtc
 {
+
+    //---------------------------------------------------------------------------------------------------------------------
+
     VulkanTexture2D::VulkanTexture2D(const uint32_t w, const uint32_t h)
         : ITexture2D(w, h)
+        , m_textureImage(nullptr)
+        , m_textureImageMemory(nullptr)
+        , m_textureImageMemorySize(0)
+        , m_device(nullptr)
+        , m_fence(nullptr)
+        , m_commandBuffer(nullptr)
         , m_textureFormat(VK_FORMAT_B8G8R8A8_UNORM)
     {
     }
@@ -17,27 +26,58 @@ namespace webrtc
 
     void VulkanTexture2D::Shutdown()
     {
-        if (m_unityVulkanImage.image != VK_NULL_HANDLE)
-        {
-            vkDestroyImage(m_Instance.device, m_unityVulkanImage.image, m_allocator);
-            m_unityVulkanImage.image = VK_NULL_HANDLE;
-        }
-        if (m_unityVulkanImage.memory.memory != VK_NULL_HANDLE)
-        {
-            vkFreeMemory(m_Instance.device, m_unityVulkanImage.memory.memory, m_allocator);
-            m_unityVulkanImage.memory.memory = VK_NULL_HANDLE;
-        }
-        m_unityVulkanImage.memory.size = 0;
-        m_Instance.device = nullptr;
+        if (m_textureImage)
+            vkDestroyImage(m_device, m_textureImage, m_allocator);
+        if (m_textureImageMemory)
+            vkFreeMemory(m_device, m_textureImageMemory, m_allocator);
+        if (m_commandBuffer)
+            vkFreeCommandBuffers(m_device, m_commandPool, 1, &m_commandBuffer);
+        if (m_fence)
+            vkDestroyFence(m_device, m_fence, nullptr);
+
+        m_textureImage = nullptr;
+        m_textureImageMemory = nullptr;
+        m_textureImageMemorySize = 0;
+        m_device = nullptr;
+        m_commandPool = nullptr;
     }
 
-    bool VulkanTexture2D::Init(const UnityVulkanInstance* instance)
+    bool
+    VulkanTexture2D::Init(const VkPhysicalDevice physicalDevice, const VkDevice device, const VkCommandPool commandPool)
     {
-        m_Instance = *instance;
+        m_physicalDevice = physicalDevice;
+        m_device = device;
+        m_commandPool = commandPool;
+
+        // Create a command buffer to copy
+        VkCommandBufferAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
+
+        VkResult result = vkAllocateCommandBuffers(m_device, &allocInfo, &m_commandBuffer);
+        if (result != VK_SUCCESS)
+        {
+            RTC_LOG(LS_INFO) << "vkAllocateCommandBuffers failed. result:" << result;
+            return false;
+        }
+
+        VkFenceCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.flags = 0;
+        result = vkCreateFence(m_device, &createInfo, nullptr, &m_fence);
+        if (result != VK_SUCCESS)
+        {
+            RTC_LOG(LS_INFO) << "vkCreateFence failed. result:" << result;
+            return false;
+        }
 
         const bool EXPORT_HANDLE = true;
-        VkResult result = VulkanUtility::CreateImage(
-            m_Instance,
+        result = VulkanUtility::CreateImage(
+            physicalDevice,
+            device,
             m_allocator,
             m_width,
             m_height,
@@ -53,30 +93,56 @@ namespace webrtc
             return false;
         }
 
+        m_textureImage = m_unityVulkanImage.image;
+        m_textureImageMemory = m_unityVulkanImage.memory.memory;
+        m_textureImageMemorySize = m_unityVulkanImage.memory.size;
+
         return true;
     }
 
-    bool VulkanTexture2D::InitStaging(const UnityVulkanInstance* instance, bool writable, bool hasHostCachedMemory)
+    //---------------------------------------------------------------------------------------------------------------------
+    bool VulkanTexture2D::InitCpuRead(
+        const VkPhysicalDevice physicalDevice, const VkDevice device, const VkCommandPool commandPool)
     {
-        m_Instance = *instance;
+        m_physicalDevice = physicalDevice;
+        m_device = device;
+        m_commandPool = commandPool;
 
-        VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        // Create a command buffer to copy
+        VkCommandBufferAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
 
-        if (writable)
-            properties |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        else
-            properties |=
-                (hasHostCachedMemory ? VK_MEMORY_PROPERTY_HOST_CACHED_BIT : VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        VkResult result = vkAllocateCommandBuffers(m_device, &allocInfo, &m_commandBuffer);
+        if (result != VK_SUCCESS)
+        {
+            RTC_LOG(LS_INFO) << "vkAllocateCommandBuffers failed. result:" << result;
+            return false;
+        }
+
+        VkFenceCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.flags = 0;
+        result = vkCreateFence(m_device, &createInfo, nullptr, &m_fence);
+        if (result != VK_SUCCESS)
+        {
+            RTC_LOG(LS_INFO) << "vkCreateFence failed. result:" << result;
+            return false;
+        }
 
         const bool EXPORT_HANDLE = false;
-        VkResult result = VulkanUtility::CreateImage(
-            m_Instance,
+        result = VulkanUtility::CreateImage(
+            physicalDevice,
+            device,
             m_allocator,
             m_width,
             m_height,
             VK_IMAGE_TILING_LINEAR,
-            (writable ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : VK_IMAGE_USAGE_TRANSFER_DST_BIT),
-            properties,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             m_textureFormat,
             &m_unityVulkanImage,
             EXPORT_HANDLE);
@@ -86,11 +152,9 @@ namespace webrtc
             return false;
         }
 
-        VkImageSubresource subresource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
-        VkSubresourceLayout subresourceLayout;
-        vkGetImageSubresourceLayout(m_Instance.device, m_unityVulkanImage.image, &subresource, &subresourceLayout);
-        m_rowPitch = static_cast<size_t>(subresourceLayout.rowPitch);
-
+        m_textureImage = m_unityVulkanImage.image;
+        m_textureImageMemory = m_unityVulkanImage.memory.memory;
+        m_textureImageMemorySize = m_unityVulkanImage.memory.size;
         return true;
     }
 } // end namespace webrtc

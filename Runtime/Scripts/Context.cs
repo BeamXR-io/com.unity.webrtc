@@ -61,7 +61,7 @@ namespace Unity.WebRTC
         public struct BatchData
         {
             public int tracksCount;
-            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)]
+            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex=0)]
             public IntPtr[] tracks;
         }
 
@@ -266,10 +266,7 @@ namespace Unity.WebRTC
         {
             NativeMethods.DataChannelRegisterOnClose(self, channel, callback);
         }
-        public void DataChannelRegisterOnError(IntPtr channel, DelegateNativeOnError callback)
-        {
-            NativeMethods.DataChannelRegisterOnError(self, channel, callback);
-        }
+
         public IntPtr CreateMediaStream(string label)
         {
             return NativeMethods.ContextCreateMediaStream(self, label);

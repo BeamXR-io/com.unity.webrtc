@@ -15,7 +15,6 @@ EXPORTED_VULKAN_FUNCTION(vkGetInstanceProcAddr)
 #endif
 
 GLOBAL_VULKAN_FUNCTION(vkCreateInstance)
-GLOBAL_VULKAN_FUNCTION(vkGetPhysicalDeviceImageFormatProperties2)
 
 #undef GLOBAL_VULKAN_FUNCTION
 

@@ -39,14 +39,14 @@ namespace webrtc
         UnityVideoTrackSource(
             bool is_screencast, absl::optional<bool> needs_denoising, TaskQueueFactory* taskQueueFactory);
         ~UnityVideoTrackSource() override;
+        // void SetState(SourceState state);
         SourceState state() const override;
 
         bool remote() const override;
         bool is_screencast() const override;
         absl::optional<bool> needs_denoising() const override;
-        bool syncApplicationFramerate() const { return syncApplicationFramerate_; };
         void OnFrameCaptured(rtc::scoped_refptr<VideoFrame> frame);
-        void SetSyncApplicationFramerate(bool value);
+
         using VideoTrackSourceInterface::AddOrUpdateSink;
         using VideoTrackSourceInterface::RemoveSink;
 
@@ -54,8 +54,7 @@ namespace webrtc
         Create(bool is_screencast, absl::optional<bool> needs_denoising, TaskQueueFactory* taskQueueFactory);
 
     private:
-        void OnUpdateVideoFrame();
-        void CaptureVideoFrame();
+        void CaptureNextFrame();
         void SendFeedback();
         FrameAdaptationParams ComputeAdaptationParams(int width, int height, int64_t time_us);
 
@@ -81,7 +80,6 @@ namespace webrtc
         std::unique_ptr<rtc::TaskQueue> taskQueue_;
         std::unique_ptr<VideoFrameScheduler> scheduler_;
         rtc::scoped_refptr<unity::webrtc::VideoFrame> frame_;
-        bool syncApplicationFramerate_;
     };
 
 } // end namespace webrtc

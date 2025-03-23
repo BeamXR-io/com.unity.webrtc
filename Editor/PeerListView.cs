@@ -39,8 +39,7 @@ namespace Unity.WebRTC.Editor
                     var button = new Button(() =>
                     {
                         OnChangePeer?.Invoke(peerConnection);
-                    })
-                    { text = $"peer {peerConnection.GetHashCode()}", };
+                    }) {text = $"peer {peerConnection.GetHashCode()}",};
 
                     if (EditorGUIUtility.isProSkin)
                     {

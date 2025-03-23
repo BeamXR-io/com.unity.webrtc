@@ -11,12 +11,10 @@ namespace webrtc
 
     void UnityLogStream::OnLogMessage(const std::string& message)
     {
-        logMessage(message, rtc::LoggingSeverity::LS_INFO);
-    }
-
-    void UnityLogStream::OnLogMessage(const std::string& message, rtc::LoggingSeverity severity)
-    {
-        logMessage(message, severity);
+        if (on_log_message != nullptr)
+        {
+            on_log_message(message.c_str());
+        }
     }
 
     void UnityLogStream::AddLogStream(DelegateDebugLog callback, rtc::LoggingSeverity loggingSeverity)
@@ -32,14 +30,6 @@ namespace webrtc
         {
             rtc::LogMessage::RemoveLogToStream(log_stream.get());
             log_stream.reset();
-        }
-    }
-
-    void UnityLogStream::logMessage(const std::string& message, rtc::LoggingSeverity severity)
-    {
-        if (on_log_message != nullptr)
-        {
-            on_log_message(message.c_str(), severity);
         }
     }
 

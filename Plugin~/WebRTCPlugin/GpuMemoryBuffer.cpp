@@ -50,12 +50,12 @@ namespace webrtc
     {
         if (!device_->ResetSync(texture_.get()))
         {
-            RTC_LOG(LS_ERROR) << "texture ResetSync failed.";
+            RTC_LOG(LS_INFO) << "ResetSync failed.";
             return false;
         }
         if (!device_->ResetSync(textureCpuRead_.get()))
         {
-            RTC_LOG(LS_ERROR) << "textureCpuRead ResetSync failed.";
+            RTC_LOG(LS_INFO) << "ResetSync failed.";
             return false;
         }
         return true;
@@ -79,11 +79,11 @@ namespace webrtc
     rtc::scoped_refptr<I420BufferInterface> GpuMemoryBufferFromUnity::ToI420()
     {
         using namespace std::chrono_literals;
-        if (!device_->WaitSync(textureCpuRead_.get()))
+        const std::chrono::nanoseconds timeout(30ms); // 30ms
+        if (!device_->WaitSync(textureCpuRead_.get(), timeout.count()))
         {
-            RTC_LOG(LS_ERROR) << "GpuMemoryBufferFromUnity::ToI420 WaitSync failed.";
-            // workaround for android vulkan
-            return I420Buffer::Create(textureCpuRead_->GetWidth(), textureCpuRead_->GetHeight());
+            RTC_LOG(LS_INFO) << "WaitSync failed.";
+            return nullptr;
         }
         return device_->ConvertRGBToI420(textureCpuRead_.get());
     }
@@ -91,9 +91,10 @@ namespace webrtc
     const GpuMemoryBufferHandle* GpuMemoryBufferFromUnity::handle() const
     {
         using namespace std::chrono_literals;
-        if (!device_->WaitSync(texture_.get()))
+        const std::chrono::nanoseconds timeout(30ms); // 30ms
+        if (!device_->WaitSync(texture_.get(), timeout.count()))
         {
-            RTC_LOG(LS_ERROR) << "GpuMemoryBufferFromUnity::handle WaitSync failed.";
+            RTC_LOG(LS_INFO) << "WaitSync failed.";
             return nullptr;
         }
         return handle_.get();

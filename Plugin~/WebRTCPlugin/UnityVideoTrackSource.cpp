@@ -20,14 +20,11 @@ namespace webrtc
         : AdaptedVideoTrackSource(/*required_alignment=*/1)
         , is_screencast_(is_screencast)
         , frame_(nullptr)
-        , syncApplicationFramerate_(true)
     {
         taskQueue_ = std::make_unique<rtc::TaskQueue>(
             taskQueueFactory->CreateTaskQueue("VideoFrameScheduler", TaskQueueFactory::Priority::NORMAL));
         scheduler_ = std::make_unique<VideoFrameScheduler>(taskQueue_->Get());
-        scheduler_->Start(std::bind(&UnityVideoTrackSource::OnUpdateVideoFrame, this));
-        if (syncApplicationFramerate_)
-            scheduler_->Pause(true);
+        scheduler_->Start(std::bind(&UnityVideoTrackSource::CaptureNextFrame, this));
     }
 
     UnityVideoTrackSource::~UnityVideoTrackSource() { scheduler_ = nullptr; }
@@ -57,14 +54,9 @@ namespace webrtc
 
     absl::optional<bool> UnityVideoTrackSource::needs_denoising() const { return needs_denoising_; }
 
-    void UnityVideoTrackSource::OnUpdateVideoFrame()
+    void UnityVideoTrackSource::CaptureNextFrame()
     {
         const std::unique_lock<std::mutex> lock(mutex_);
-        CaptureVideoFrame();
-    }
-
-    void UnityVideoTrackSource::CaptureVideoFrame()
-    {
         if (!frame_)
             return;
 
@@ -102,18 +94,6 @@ namespace webrtc
 
         const std::unique_lock<std::mutex> lock(mutex_);
         frame_ = frame;
-
-        if (syncApplicationFramerate_)
-            CaptureVideoFrame();
-    }
-
-    void UnityVideoTrackSource::SetSyncApplicationFramerate(bool value)
-    {
-        if (syncApplicationFramerate_ == value)
-            return;
-
-        scheduler_->Pause(value);
-        syncApplicationFramerate_ = value;
     }
 
 } // end namespace webrtc

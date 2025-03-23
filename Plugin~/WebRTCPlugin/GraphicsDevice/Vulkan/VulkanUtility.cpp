@@ -16,12 +16,11 @@ namespace webrtc
 
 #ifdef _WIN32
     static PFN_vkGetMemoryWin32HandleKHR vkGetMemoryWin32HandleKHR = nullptr;
-#else
-    static PFN_vkGetMemoryFdKHR vkGetMemoryFdKHR = nullptr;
 #endif
+    static PFN_vkGetMemoryFdKHR vkGetMemoryFdKHR = nullptr;
     static PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = nullptr;
 
-    bool VulkanUtility::FindMemoryTypeIndex(
+    bool VulkanUtility::FindMemoryTypeInto(
         const VkPhysicalDevice physicalDevice,
         uint32_t typeFilter,
         VkMemoryPropertyFlags properties,
@@ -43,12 +42,14 @@ namespace webrtc
 
         return false;
     }
+    //---------------------------------------------------------------------------------------------------------------------
 
     // initialLayout must be either VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED
     // We use VK_IMAGE_LAYOUT_UNDEFINED here.
     // Returns 0 when failed
-    VkResult VulkanUtility::CreateImage(
-        const UnityVulkanInstance& instance,
+    VkDeviceSize VulkanUtility::CreateImage(
+        const VkPhysicalDevice physicalDevice,
+        const VkDevice device,
         const VkAllocationCallbacks* allocator,
         const uint32_t width,
         const uint32_t height,
@@ -56,19 +57,12 @@ namespace webrtc
         const VkImageUsageFlags usage,
         const VkMemoryPropertyFlags properties,
         const VkFormat format,
-        UnityVulkanImage* unityVulkanImage,
+        VkImage* image,
+        VkDeviceMemory* imageMemory,
         bool exportHandle)
     {
-        VkExternalMemoryImageCreateInfo externalInfo = {};
         VkImageCreateInfo imageInfo = {};
-
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        if (exportHandle)
-        {
-            externalInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-            externalInfo.handleTypes = EXTERNAL_MEMORY_HANDLE_SUPPORTED_TYPE;
-            imageInfo.pNext = &externalInfo;
-        }
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.extent.width = static_cast<uint32_t>(width);
         imageInfo.extent.height = static_cast<uint32_t>(height);
@@ -82,56 +76,109 @@ namespace webrtc
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.flags = 0; // Optional
-        VkResult result = vkCreateImage(instance.device, &imageInfo, allocator, &unityVulkanImage->image);
-        if (result != VK_SUCCESS)
+        if (vkCreateImage(device, &imageInfo, allocator, image) != VK_SUCCESS)
         {
-            RTC_LOG(LS_ERROR) << "Failed vkCreateImage result: " << result;
-            return result;
+            return 0;
         }
 
         VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(instance.device, unityVulkanImage->image, &memRequirements);
+        vkGetImageMemoryRequirements(device, *image, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        bool success = VulkanUtility::FindMemoryTypeIndex(
-            instance.physicalDevice, memRequirements.memoryTypeBits, properties, &allocInfo.memoryTypeIndex);
-        RTC_CHECK(success);
+        if (!VulkanUtility::FindMemoryTypeInto(
+                physicalDevice, memRequirements.memoryTypeBits, properties, &allocInfo.memoryTypeIndex))
+        {
+            return 0;
+        }
 
-        VkExportMemoryAllocateInfo exportInfo = {};
-        VkMemoryDedicatedAllocateInfo dedicatedAllocateInfo = {};
+        VkExportMemoryAllocateInfoKHR exportInfo = {};
         if (exportHandle)
         {
-            // When AllocateMemory is executed, Android requires the VkImage to be used as additional information.
-            dedicatedAllocateInfo.sType  = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
-            dedicatedAllocateInfo.pNext  = nullptr;
-            dedicatedAllocateInfo.buffer = VK_NULL_HANDLE;
-            dedicatedAllocateInfo.image  = unityVulkanImage->image;
-            exportInfo.pNext = &dedicatedAllocateInfo;
-            exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
-            exportInfo.handleTypes = EXTERNAL_MEMORY_HANDLE_SUPPORTED_TYPE;
+            exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
+            exportInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
             allocInfo.pNext = &exportInfo;
         }
 
-        result = vkAllocateMemory(instance.device, &allocInfo, allocator, &unityVulkanImage->memory.memory);
+        if (vkAllocateMemory(device, &allocInfo, allocator, imageMemory) != VK_SUCCESS)
+        {
+            return 0;
+        }
+
+        VULKAN_CHECK_FAILVALUE(vkBindImageMemory(device, *image, *imageMemory, 0), 0)
+
+        return memRequirements.size;
+    }
+
+    //---------------------------------------------------------------------------------------------------------------------
+    VkResult VulkanUtility::CreateImage(
+        const VkPhysicalDevice physicalDevice,
+        const VkDevice device,
+        const VkAllocationCallbacks* allocator,
+        const uint32_t width,
+        const uint32_t height,
+        const VkImageTiling tiling,
+        const VkImageUsageFlags usage,
+        const VkMemoryPropertyFlags properties,
+        const VkFormat format,
+        UnityVulkanImage* unityVulkanImage,
+        bool exportHandle)
+    {
+        VkImageCreateInfo imageInfo = {};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = static_cast<uint32_t>(width);
+        imageInfo.extent.height = static_cast<uint32_t>(height);
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = format;
+        imageInfo.tiling = tiling;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = usage;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.flags = 0; // Optional
+        VkResult result = vkCreateImage(device, &imageInfo, allocator, &unityVulkanImage->image);
         if (result != VK_SUCCESS)
         {
-            RTC_LOG(LS_ERROR) << "Failed vkAllocateMemory result: " << result;
+            return result;
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(device, unityVulkanImage->image, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        bool success = VulkanUtility::FindMemoryTypeInto(
+            physicalDevice, memRequirements.memoryTypeBits, properties, &allocInfo.memoryTypeIndex);
+        RTC_CHECK(success);
+
+        VkExportMemoryAllocateInfoKHR exportInfo = {};
+        if (exportHandle)
+        {
+            exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
+            exportInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+            allocInfo.pNext = &exportInfo;
+        }
+
+        result = vkAllocateMemory(device, &allocInfo, allocator, &unityVulkanImage->memory.memory);
+        if (result != VK_SUCCESS)
+        {
             return result;
         }
 
         const VkDeviceSize memoryOffset = 0;
-        result =
-            vkBindImageMemory(instance.device, unityVulkanImage->image, unityVulkanImage->memory.memory, memoryOffset);
+        result = vkBindImageMemory(device, unityVulkanImage->image, unityVulkanImage->memory.memory, memoryOffset);
         if (result != VK_SUCCESS)
         {
-            RTC_LOG(LS_ERROR) << "Failed vkBindImageMemory result: " << result;
             return result;
         }
 
         unityVulkanImage->memory.offset = memoryOffset;
-        unityVulkanImage->memory.size = allocInfo.allocationSize;
+        unityVulkanImage->memory.size = memRequirements.size;
         unityVulkanImage->memory.flags = properties;
         unityVulkanImage->memory.memoryTypeIndex = allocInfo.memoryTypeIndex;
         unityVulkanImage->layout = imageInfo.initialLayout;
@@ -147,12 +194,10 @@ namespace webrtc
         return VK_SUCCESS;
     }
 
+    //---------------------------------------------------------------------------------------------------------------------
     // returns VK_NULL_HANDLE when failed
     VkImageView VulkanUtility::CreateImageView(
-        const UnityVulkanInstance& instance,
-        const VkAllocationCallbacks* allocator,
-        const VkImage image,
-        const VkFormat format)
+        const VkDevice device, const VkAllocationCallbacks* allocator, const VkImage image, const VkFormat format)
     {
         VkImageViewCreateInfo viewInfo = {};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -170,17 +215,19 @@ namespace webrtc
         viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
         VkImageView imageView = nullptr;
-        if (vkCreateImageView(instance.device, &viewInfo, allocator, &imageView) != VK_SUCCESS)
+        if (vkCreateImageView(device, &viewInfo, allocator, &imageView) != VK_SUCCESS)
         {
-            RTC_LOG(LS_ERROR) << "Failed vkCreateImageView";
+            RTC_LOG(LS_INFO) << "Failed vkCreateImageView";
             return nullptr;
         }
 
         return imageView;
     }
 
+    //---------------------------------------------------------------------------------------------------------------------
+
     // Requires VK_KHR_get_physical_device_properties2 extension
-    bool VulkanUtility::GetPhysicalDeviceUUID(
+    bool VulkanUtility::GetPhysicalDeviceUUIDInto(
         VkInstance instance, VkPhysicalDevice phyDevice, std::array<uint8_t, VK_UUID_SIZE>* deviceUUID)
     {
         VkPhysicalDeviceIDPropertiesKHR deviceIDProps = {};
@@ -256,7 +303,7 @@ namespace webrtc
         VkMemoryGetWin32HandleInfoKHR handleInfo = {};
         handleInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
         handleInfo.memory = memory;
-        handleInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+        handleInfo.handleType = EXTERNAL_MEMORY_HANDLE_SUPPORTED_TYPE;
 
         VkResult result = vkGetMemoryWin32HandleKHR(device, &handleInfo, &handle);
         if (result != VK_SUCCESS)
