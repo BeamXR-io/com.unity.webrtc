@@ -7,12 +7,6 @@ namespace Unity.WebRTC.RuntimeTest
 {
     class WebRTCTest
     {
-        [TearDown]
-        public void TearDown()
-        {
-            WebRTC.Logger = Debug.unityLogger;
-        }
-
         [Test]
         public void GraphicsFormat()
         {
@@ -62,7 +56,7 @@ namespace Unity.WebRTC.RuntimeTest
         [TestCase(2160, 3840)]
         public void ValidateTextureSize(int width, int height)
         {
-            if (!WebRTC.enableLimitTextureSize)
+            if(!WebRTC.enableLimitTextureSize)
                 WebRTC.enableLimitTextureSize = true;
 
             var platform = Application.platform;
@@ -108,35 +102,6 @@ namespace Unity.WebRTC.RuntimeTest
         public void ValidateLegacyGraphicsFormat(GraphicsFormat format)
         {
             Assert.That(() => WebRTC.ValidateGraphicsFormat(format), Throws.Nothing);
-        }
-
-        [Test]
-        public void EnableLogging()
-        {
-            Assert.DoesNotThrow(() => WebRTC.ConfigureNativeLogging(true, NativeLoggingSeverity.Verbose));
-            Assert.DoesNotThrow(() => WebRTC.ConfigureNativeLogging(false, NativeLoggingSeverity.None));
-        }
-
-        [Test]
-        public void Logger()
-        {
-            Assert.NotNull(WebRTC.Logger);
-            Assert.AreEqual(WebRTC.Logger, Debug.unityLogger);
-
-            Assert.That(() => WebRTC.Logger = null, Throws.ArgumentNullException);
-
-            MockLogger logger = new MockLogger();
-            Assert.That(() => WebRTC.Logger = logger, Throws.Nothing);
-            Assert.AreEqual(logger, WebRTC.Logger);
-
-            Assert.That(() => WebRTC.Logger = Debug.unityLogger, Throws.Nothing);
-        }
-
-        [Test]
-        public void SyncTimeout()
-        {
-            Assert.DoesNotThrow(() => WebRTC.SetGraphicsSyncTimeout(1));
-            Assert.DoesNotThrow(() => WebRTC.SetGraphicsSyncTimeout(60 * 1000 * 1000));
         }
     }
 }

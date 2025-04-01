@@ -231,7 +231,7 @@ namespace webrtc
         const auto error = connection->SetConfiguration(_config);
         if (!error.ok())
         {
-            LogPrint(rtc::LoggingSeverity::LS_ERROR, error.message());
+            LogPrint(error.message());
         }
         return error.type();
     }

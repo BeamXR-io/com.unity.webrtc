@@ -6,6 +6,8 @@
 
 #include "OpenGLContext.h"
 
+#define EGL_CONTEXT_OPENGL_NO_ERROR_KHR 0x31B3
+
 namespace unity
 {
 namespace webrtc
@@ -34,6 +36,29 @@ namespace webrtc
             eglGetConfigs(display, configs.data(), count, &count);
             EGLint contextAttr[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
             context_ = eglCreateContext(display, configs[0], sharedCtx, contextAttr);
+
+            if (context_ == EGL_NO_CONTEXT || eglGetError() != EGL_SUCCESS)
+            {
+                RTC_LOG(LS_ERROR) << "eglCreateContext failed:" << eglGetError();
+                RTC_LOG(LS_INFO) << "Attempting eglCreateContext for Oculus low-overhead-mode";
+                const char* extensions = eglQueryString(display, EGL_EXTENSIONS);
+                if (extensions != NULL)
+                {
+                    EGLint contextAttrLowOverhead[] =
+                    {
+                        EGL_CONTEXT_CLIENT_VERSION, 2,
+                        EGL_CONTEXT_OPENGL_NO_ERROR_KHR, EGL_TRUE,
+                        EGL_NONE
+                    };
+                    context_ = eglCreateContext(display, configs[0], sharedCtx, contextAttrLowOverhead);
+                }
+
+                if (context_ == EGL_NO_CONTEXT || eglGetError() != EGL_SUCCESS)
+                {
+                    RTC_LOG(LS_ERROR) << "eglCreateContext for low-overhead-mode failed:" << eglGetError();
+                }
+            }
+
             RTC_DCHECK(context_);
 
             if (!eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, context_))

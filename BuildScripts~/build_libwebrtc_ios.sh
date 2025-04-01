@@ -6,8 +6,8 @@ then
 fi
 
 export COMMAND_DIR=$(cd $(dirname $0); pwd)
-export PATH="$(pwd)/depot_tools:$(pwd)/depot_tools/python-bin:$PATH"
-export WEBRTC_VERSION=6367
+export PATH="$(pwd)/depot_tools:$PATH"
+export WEBRTC_VERSION=5615
 export OUTPUT_DIR="$(pwd)/out"
 export ARTIFACTS_DIR="$(pwd)/artifacts"
 export PYTHON3_BIN="$(pwd)/depot_tools/python-bin/python3"
@@ -21,12 +21,6 @@ then
   git checkout "refs/remotes/branch-heads/$WEBRTC_VERSION"
   cd ..
   gclient sync -D --force --reset
-else
-  # fetch and init config on only first time
-  cd src
-  git checkout "refs/remotes/branch-heads/$WEBRTC_VERSION"
-  cd ..
-  gclient sync -D --force --reset
 fi
 
 # add jsoncpp
@@ -34,23 +28,20 @@ patch -N "src/BUILD.gn" < "$COMMAND_DIR/patches/add_jsoncpp.patch"
 
 # disable GCD taskqueue, use stdlib taskqueue instead
 # This is because GCD cannot measure with UnityProfiler
-# patch -N "src/api/task_queue/BUILD.gn" < "$COMMAND_DIR/patches/disable_task_queue_gcd.patch"
+patch -N "src/api/task_queue/BUILD.gn" < "$COMMAND_DIR/patches/disable_task_queue_gcd.patch"
 
 # add objc library to use videotoolbox
 patch -N "src/sdk/BUILD.gn" < "$COMMAND_DIR/patches/add_objc_deps.patch"
 
-# Fix SetRawImagePlanes() in LibvpxVp8Encoder
-patch -N "src/modules/video_coding/codecs/vp8/libvpx_vp8_encoder.cc" < "$COMMAND_DIR/patches/libvpx_vp8_encoder.patch"
+# use included python
+export PATH="$(pwd)/depot_tools/bootstrap-3.8.0.chromium.8_bin/python/bin:$PATH"
 
 mkdir -p "$ARTIFACTS_DIR/lib"
-
-outputDir=""
 
 for is_debug in "true" "false"
 do
   for target_cpu in "arm64" "x64"
   do
-    outputDir="${OUTPUT_DIR}_${is_debug}_${target_cpu}"
     # generate ninja files
     # 
     # note: `treat_warnings_as_errors=false` is for avoiding LLVM warning.
@@ -58,26 +49,24 @@ do
     #       See below for details.
     #       https://bugs.chromium.org/p/webrtc/issues/detail?id=11729
     #
-    gn gen "$outputDir" --root="src" \
-      --args=" \
-      is_debug=${is_debug} \
-      is_component_build=false \
-      ios_enable_code_signing=false \
+    gn gen "$OUTPUT_DIR" --root="src" \
+      --args="is_debug=${is_debug} \
       target_os=\"ios\" \
       target_cpu=\"${target_cpu}\" \
-      treat_warnings_as_errors=false \
       rtc_use_h264=false \
+      use_custom_libcxx=false \
+      treat_warnings_as_errors=false \
+      ios_enable_code_signing=false \
       rtc_include_tests=false \
       rtc_build_examples=false \
-      rtc_build_tools=false \
-      use_custom_libcxx=false"
-      
+      use_cxx17=true"
+
     # build static library
-    ninja -C "$outputDir" webrtc
+    ninja -C "$OUTPUT_DIR" webrtc
 
     # copy static library
     mkdir -p "$ARTIFACTS_DIR/lib/${target_cpu}"
-    cp "$outputDir/obj/libwebrtc.a" "$ARTIFACTS_DIR/lib/${target_cpu}/"
+    cp "$OUTPUT_DIR/obj/libwebrtc.a" "$ARTIFACTS_DIR/lib/${target_cpu}/"
   done
 
   filename="libwebrtc.a"
@@ -96,12 +85,12 @@ do
 done
 
 "$PYTHON3_BIN" "./src/tools_webrtc/libs/generate_licenses.py" \
-  --target :webrtc "$outputDir" "$outputDir"
+  --target :webrtc "$OUTPUT_DIR" "$OUTPUT_DIR"
 
 cd src
 find . -name "*.h" -print | cpio -pd "$ARTIFACTS_DIR/include"
 
-cp "$outputDir/LICENSE.md" "$ARTIFACTS_DIR"
+cp "$OUTPUT_DIR/LICENSE.md" "$ARTIFACTS_DIR"
 
 # create zip
 cd "$ARTIFACTS_DIR"

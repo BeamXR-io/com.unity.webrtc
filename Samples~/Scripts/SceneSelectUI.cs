@@ -50,7 +50,6 @@ namespace Unity.WebRTC.Samples
         [SerializeField] private Button buttonPerfectNegotiation;
         [SerializeField] private Button buttonLatency;
         [SerializeField] private Button buttonReplaceTrack;
-        [SerializeField] private Button buttonSimulcast;
         [SerializeField] private Button buttonMetadata;
         [SerializeField] private Button buttonEncryption;
 
@@ -78,7 +77,7 @@ namespace Unity.WebRTC.Samples
                 .Where(codec => !excludeCodecMimeType.Contains(codec.mimeType))
                 .ToList();
             var list = availableCodecs
-                .Select(codec => new Dropdown.OptionData { text = codec.mimeType + " " + codec.sdpFmtpLine })
+                .Select(codec => new Dropdown.OptionData {text = codec.mimeType + " " + codec.sdpFmtpLine})
                 .ToList();
 
             codecSelector.options.AddRange(list);
@@ -130,7 +129,6 @@ namespace Unity.WebRTC.Samples
             buttonPerfectNegotiation.onClick.AddListener(OnPressedPerfectNegotiationButton);
             buttonLatency.onClick.AddListener(OnPressedLatencyButton);
             buttonReplaceTrack.onClick.AddListener(OnPressedReplaceTrackButton);
-            buttonSimulcast.onClick.AddListener(OnPressedSimulcastButton);
             buttonMetadata.onClick.AddListener(OnPressedMetadataButton);
             buttonEncryption.onClick.AddListener(OnPressedEncryption);
 
@@ -260,11 +258,6 @@ namespace Unity.WebRTC.Samples
         private void OnPressedReplaceTrackButton()
         {
             SceneManager.LoadScene("ReplaceTrack", LoadSceneMode.Single);
-        }
-
-        private void OnPressedSimulcastButton()
-        {
-            SceneManager.LoadScene("Simulcast", LoadSceneMode.Single);
         }
 
         private void OnPressedMetadataButton()

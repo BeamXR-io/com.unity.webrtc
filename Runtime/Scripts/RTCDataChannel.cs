@@ -1,5 +1,5 @@
-using System;
 using System.Runtime.InteropServices;
+using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -56,7 +56,7 @@ namespace Unity.WebRTC
         public OptionalBool negotiated;
         public OptionalInt id;
 
-        public static explicit operator RTCDataChannelInitInternal(RTCDataChannelInit origin)
+        public static explicit operator RTCDataChannelInitInternal (RTCDataChannelInit origin)
         {
             RTCDataChannelInitInternal dst = new RTCDataChannelInitInternal
             {
@@ -91,11 +91,6 @@ namespace Unity.WebRTC
     public delegate void DelegateOnDataChannel(RTCDataChannel channel);
 
     /// <summary>
-    /// 
-    /// </summary>
-    public delegate void DelegateOnError(RTCError error);
-
-    /// <summary>
     ///
     /// </summary>
     /// <seealso cref="RTCPeerConnection.CreateDataChannel(string, RTCDataChannelInit)"/>
@@ -104,15 +99,17 @@ namespace Unity.WebRTC
         private DelegateOnMessage onMessage;
         private DelegateOnOpen onOpen;
         private DelegateOnClose onClose;
-        private DelegateOnError onError;
 
         /// <summary>
         ///
         /// </summary>
         public DelegateOnMessage OnMessage
         {
-            get => onMessage;
-            set => onMessage = value;
+            get { return onMessage; }
+            set
+            {
+                onMessage = value;
+            }
         }
 
         /// <summary>
@@ -120,8 +117,11 @@ namespace Unity.WebRTC
         /// </summary>
         public DelegateOnOpen OnOpen
         {
-            get => onOpen;
-            set => onOpen = value;
+            get { return onOpen; }
+            set
+            {
+                onOpen = value;
+            }
         }
 
         /// <summary>
@@ -129,17 +129,11 @@ namespace Unity.WebRTC
         /// </summary>
         public DelegateOnClose OnClose
         {
-            get => onClose;
-            set => onClose = value;
-        }
-
-        /// <summary>
-        ///
-        /// </summary>
-        public DelegateOnError OnError
-        {
-            get => onError;
-            set => onError = value;
+            get { return onClose; }
+            set
+            {
+                onClose = value;
+            }
         }
 
         /// <summary>
@@ -193,7 +187,7 @@ namespace Unity.WebRTC
         public RTCDataChannelState ReadyState => NativeMethods.DataChannelGetReadyState(GetSelfOrThrow());
 
         [AOT.MonoPInvokeCallback(typeof(DelegateNativeOnMessage))]
-        static void DataChannelNativeOnMessage(IntPtr ptr, byte[] msg, int size)
+        static void DataChannelNativeOnMessage(IntPtr ptr, byte[] msg, int len)
         {
             WebRTC.Sync(ptr, () =>
             {
@@ -228,19 +222,6 @@ namespace Unity.WebRTC
             });
         }
 
-        [AOT.MonoPInvokeCallback(typeof(DelegateNativeOnError))]
-        static void DataChannelNativeOnError(IntPtr ptr, RTCErrorType errorType, byte[] message, int size)
-        {
-            WebRTC.Sync(ptr, () =>
-            {
-                if (WebRTC.Table[ptr] is RTCDataChannel channel)
-                {
-                    channel.onError?.Invoke(new RTCError() { errorType = errorType, message = System.Text.Encoding.UTF8.GetString(message) });
-                }
-            });
-        }
-
-
         internal RTCDataChannel(IntPtr ptr, RTCPeerConnection peerConnection)
             : base(ptr)
         {
@@ -248,7 +229,6 @@ namespace Unity.WebRTC
             WebRTC.Context.DataChannelRegisterOnMessage(self, DataChannelNativeOnMessage);
             WebRTC.Context.DataChannelRegisterOnOpen(self, DataChannelNativeOnOpen);
             WebRTC.Context.DataChannelRegisterOnClose(self, DataChannelNativeOnClose);
-            WebRTC.Context.DataChannelRegisterOnError(self, DataChannelNativeOnError);
         }
 
         /// <summary>

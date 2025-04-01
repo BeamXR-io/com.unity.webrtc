@@ -10,8 +10,6 @@
 
 using namespace webrtc;
 
-class UnityProfilerMarkerDesc;
-
 namespace unity
 {
 namespace webrtc

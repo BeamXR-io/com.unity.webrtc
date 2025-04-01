@@ -7,7 +7,7 @@
   },
   "configurePresets": [
     {
-      "name": "default-windows-vs2022",
+      "name": "default-windows",
       "displayName": "Default Windows Config",
       "hidden": true,
       "binaryDir": "${sourceDir}/out/build/${presetName}",
@@ -24,20 +24,6 @@
         }
       }
     },
-    {
-      "name": "default-windows-ninja",
-      "displayName": "Windows Ninja Config",
-      "hidden": true,
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "generator": "Ninja Multi-Config",
-      "vendor": {
-        "microsoft.com/VisualStudioSettings/CMake/1.0": {
-          "hostOS": [
-            "Windows"
-          ]
-        }
-      }
-    },    
     {
       "name": "default-macos",
       "displayName": "Default macOS Config",
@@ -108,27 +94,18 @@
     {
       "name": "x64-windows-msvc",
       "description": "Sets x64 arch, generator, compilers",
-      "inherits": "default-windows-vs2022"
+      "inherits": "default-windows"
     },
     {
-      "name": "x64-windows-clangcl",
+      "name": "x64-windows-clang",
       "description": "Sets x64 arch, generator, compilers",
       "toolset": "ClangCL",
-      "inherits": "default-windows-vs2022",
+      "inherits": "default-windows",
       "vendor": {
         "microsoft.com/VisualStudioSettings/CMake/1.0": {
           "intelliSenseMode": "windows-clang-x64"
         }
       }      
-    },
-    {
-      "name": "x64-windows-clang",
-      "description": "Sets x64 arch, generator, compilers",
-      "inherits": "default-windows-ninja",
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
-      }
     },
     {
       "name": "macos",
@@ -168,18 +145,18 @@
   ],
   "buildPresets": [
     {
-      "name": "debug-windows-clangcl",
+      "name": "debug-windows-clang",
       "displayName": "Build Debug",
-      "description": "Debug build using Clang-CL",
-      "configurePreset": "x64-windows-clangcl",
+      "description": "Debug build using Clang",
+      "configurePreset": "x64-windows-clang",
       "configuration": "Debug",
       "verbose": true
     },
     {
-      "name": "release-windows-clangcl",
+      "name": "release-windows-clang",
       "displayName": "Build Release",
-      "description": "Release build using Clang-CL",
-      "configurePreset": "x64-windows-clangcl",
+      "description": "Release build using Clang",
+      "configurePreset": "x64-windows-clang",
       "configuration": "Release",
       "cleanFirst": true
     },
@@ -199,22 +176,6 @@
       "configuration": "Release",
       "cleanFirst": true
     },
-    {
-      "name": "debug-windows-clang",
-      "displayName": "Build Debug",
-      "description": "Debug build using Clang",
-      "configurePreset": "x64-windows-clang",
-      "configuration": "Debug",
-      "verbose": true
-    },
-    {
-      "name": "release-windows-clang",
-      "displayName": "Build Release",
-      "description": "Release build using Clang",
-      "configurePreset": "x64-windows-clang",
-      "configuration": "Release",
-      "cleanFirst": true
-    },    
     {
       "name": "debug-macos",
       "displayName": "Build Debug",

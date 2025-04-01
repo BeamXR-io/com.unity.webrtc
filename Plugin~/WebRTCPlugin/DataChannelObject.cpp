@@ -10,10 +10,6 @@ namespace webrtc
     DataChannelObject::DataChannelObject(
         rtc::scoped_refptr<webrtc::DataChannelInterface> channel, PeerConnectionObject& pc)
         : dataChannel(channel)
-        , onMessage(nullptr)
-        , onOpen(nullptr)
-        , onClose(nullptr)
-        , onError(nullptr)
     {
         dataChannel->RegisterObserver(this);
     }
@@ -38,28 +34,17 @@ namespace webrtc
         switch (state)
         {
         case webrtc::DataChannelInterface::kOpen:
-            if (onOpen)
-                onOpen(dataChannel.get());
+            if (onOpen != nullptr)
+            {
+                onOpen(this->dataChannel.get());
+            }
             break;
         case webrtc::DataChannelInterface::kClosed:
-        {
-            RTCError error = dataChannel->error();
-            if (error.type() == RTCErrorType::NONE)
+            if (onClose != nullptr)
             {
-                if (onClose)
-                    onClose(dataChannel.get());
-            }
-            else
-            {
-                if (onError)
-                    onError(
-                        dataChannel.get(),
-                        error.type(),
-                        error.message(),
-                        static_cast<int32_t>(std::strlen(error.message())));
+                onClose(this->dataChannel.get());
             }
             break;
-        }
         case webrtc::DataChannelInterface::kConnecting:
         case webrtc::DataChannelInterface::kClosing:
             break;
@@ -67,12 +52,12 @@ namespace webrtc
     }
     void DataChannelObject::OnMessage(const webrtc::DataBuffer& buffer)
     {
-        if (onMessage)
+        if (onMessage != nullptr)
         {
             size_t size = buffer.data.size();
             if (onMessage != nullptr)
             {
-                onMessage(dataChannel.get(), buffer.data.data(), static_cast<int32_t>(size));
+                onMessage(this->dataChannel.get(), buffer.data.data(), static_cast<int32_t>(size));
             }
         }
     }
